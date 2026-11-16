@@ -211,6 +211,26 @@ input:focus,select:focus,textarea:focus{border-color:var(--blue2);background:#ff
         <div class="err" id="e-gender">Please select your gender.</div>
       </div>
       <div class="field">
+        <label class="l">Level You Tutor <span>*</span></label>
+        <div class="seg">
+          <input type="radio" name="level" id="lE" value="Elementary"><label for="lE">Elementary</label>
+          <input type="radio" name="level" id="lH" value="High School"><label for="lH">High School</label>
+        </div>
+        <div class="err" id="e-level">Please select the level you tutor.</div>
+      </div>
+      <div class="field" id="gradeBox" style="display:none">
+        <label class="l" id="gradeLbl">Grade Level(s) <span>*</span></label>
+        <div class="opts" id="gradeOpts"></div>
+        <div class="hint">Select all grade levels you tutor.</div>
+        <div class="err" id="e-grade">Please select at least one grade level.</div>
+      </div>
+      <div class="field">
+        <label class="l" for="tutees">Number of Tutees <span>*</span></label>
+        <input type="text" id="tutees" inputmode="numeric" maxlength="3" placeholder="e.g., 10">
+        <div class="hint">Total number of learners you handle as a tutor.</div>
+        <div class="err" id="e-tutees">Please enter a valid number of tutees (1 or more).</div>
+      </div>
+      <div class="field">
         <label class="l">Food Restrictions <span>*</span></label>
         <div class="opts" id="foodOpts">
           <input type="checkbox" id="f0" value="None"><label for="f0">None</label>
@@ -282,6 +302,16 @@ dSel.addEventListener('change',()=>{
   sSel.disabled=false;
 });
 
+// Level -> grade chips (Elementary: 1-6, High School: 7-10)
+const GRADES={'Elementary':[1,2,3,4,5,6],'High School':[7,8,9,10]};
+document.querySelectorAll('input[name=level]').forEach(r=>r.addEventListener('change',()=>{
+  const lv=document.querySelector('input[name=level]:checked').value;
+  $('gradeOpts').innerHTML=GRADES[lv].map(g=>`<input type="checkbox" name="grade" id="gr${g}" value="Grade ${g}"><label for="gr${g}">Grade ${g}</label>`).join('');
+  $('gradeLbl').innerHTML=(lv==='Elementary'?'Grade Level(s) · Grades 1–6':'Grade Level(s) · Grades 7–10')+' <span>*</span>';
+  $('gradeBox').style.display='block'; $('e-grade').classList.remove('show'); $('e-level').classList.remove('show');
+}));
+$('tutees').addEventListener('input',e=>{e.target.value=e.target.value.replace(/\D/g,'');e.target.classList.remove('invalid')});
+
 // Food restriction logic: "None" is exclusive; "Other"/"Food allergy" need details
 const foods=[...document.querySelectorAll('#foodOpts input')];
 function syncFood(e){
@@ -300,6 +330,9 @@ function validate(){
   showErr('e-fullName',bad,$('fullName')); if(bad){ok=false;first=first||$('fullName')}
   [['district','e-district'],['school','e-school']].forEach(([i,e])=>{const b=!$(i).value;showErr(e,b,$(i));if(b){ok=false;first=first||$(i)}});
   const g=document.querySelector('input[name=gender]:checked'); showErr('e-gender',!g); if(!g){ok=false;first=first||$('gM')}
+  const lv=document.querySelector('input[name=level]:checked'); showErr('e-level',!lv); if(!lv){ok=false;first=first||$('lE')}
+  if(lv){const gs=document.querySelectorAll('input[name=grade]:checked'); showErr('e-grade',!gs.length); if(!gs.length){ok=false;first=first||$('gradeBox')}}
+  const tn=parseInt($('tutees').value,10); const tbad=!(tn>=1&&tn<=500); showErr('e-tutees',tbad,$('tutees')); if(tbad){ok=false;first=first||$('tutees')}
   const picked=foods.filter(f=>f.checked); showErr('e-food',!picked.length); if(!picked.length){ok=false;first=first||$('f0')}
   const needs=($('f6').checked||$('f7').checked)&&!$('otherText').value.trim();
   showErr('e-other',needs,$('otherText')); if(needs){ok=false;first=first||$('otherText')}
@@ -316,6 +349,9 @@ $('regForm').addEventListener('submit',async e=>{
     fullName:$('fullName').value.trim().replace(/\s+/g,' ').toUpperCase(),
     district:dSel.value, school:sSel.value,
     gender:document.querySelector('input[name=gender]:checked').value,
+    level:document.querySelector('input[name=level]:checked').value,
+    grades:[...document.querySelectorAll('input[name=grade]:checked')].map(g=>g.value).join(', '),
+    tutees:parseInt($('tutees').value,10),
     food:picked.join(', ')+(other&&($('f6').checked||$('f7').checked)?' — '+other:'')
   };
   const btn=$('submitBtn'); btn.disabled=true; const old=btn.innerHTML; btn.textContent='Submitting…';
@@ -334,13 +370,15 @@ $('regForm').addEventListener('submit',async e=>{
        <div><span>District</span><b>${esc(data.district)}</b></div>
        <div><span>School</span><b>${esc(data.school)}</b></div>
        <div><span>Gender</span><b>${esc(data.gender)}</b></div>
+       <div><span>Level / Grade(s)</span><b>${esc(data.level)} — ${esc(data.grades)}</b></div>
+       <div><span>Number of Tutees</span><b>${esc(data.tutees)}</b></div>
        <div><span>Food Restrictions</span><b>${esc(data.food)}</b></div>`;
     go('pg-done');
   }catch(err){ toast('Could not submit. Check your internet and try again.'); console.error(err); }
   finally{ btn.disabled=false; btn.innerHTML=old; }
 });
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function resetAndHome(){ $('regForm').reset(); sSel.innerHTML='<option value="">Select district first…</option>'; sSel.disabled=true; syncFood(); go('pg-home'); }
+function resetAndHome(){ $('regForm').reset(); $('gradeBox').style.display='none'; $('gradeOpts').innerHTML=''; sSel.innerHTML='<option value="">Select district first…</option>'; sSel.disabled=true; syncFood(); go('pg-home'); }
 </script>
 </body>
 </html>
